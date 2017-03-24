@@ -7,9 +7,11 @@
 *.bak
 phonebook_opt
 phonebook_orig
+phonebook_tp
 calculate
 orig.txt
 opt.txt
+tp.txt
 output.txt
 runtime.png
 *aligned.txt

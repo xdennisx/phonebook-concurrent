@@ -15,7 +15,7 @@ ifeq ($(strip $(DEBUG)),1)
 CFLAGS_opt += -DDEBUG -g
 endif
 
-EXEC = phonebook_orig phonebook_opt
+EXEC = phonebook_orig phonebook_opt phonebook_tp
 GIT_HOOKS := .git/hooks/applied
 .PHONY: all
 all: $(GIT_HOOKS) $(EXEC)
@@ -39,6 +39,11 @@ phonebook_opt: $(SRCS_common) phonebook_opt.c phonebook_opt.h text_align.c
 		-DIMPL="\"$@.h\"" -o $@ \
 		$(SRCS_common) $@.c text_align.c
 
+phonebook_tp: $(SRCS_common) phonebook_opt.c phonebook_opt.h text_align.c
+	$(CC) $(CFLAGS_common) $(CFLAGS_opt) \
+		-DIMPL="\"phonebook_opt.h\"" -DTP -o $@ \
+		$(SRCS_common) phonebook_opt.c threadpool.c text_align.c
+
 run: $(EXEC)
 	echo 3 | sudo tee /proc/sys/vm/drop_caches
 	watch -d -t "./phonebook_orig && echo 3 | sudo tee /proc/sys/vm/drop_caches"
@@ -50,6 +55,9 @@ cache-test: $(EXEC)
 	perf stat --repeat 100 \
 		-e cache-misses,cache-references,instructions,cycles \
 		./phonebook_opt
+	perf stat --repeat 100 \
+		-e cache-misses,cache-references,instructions,cycles \
+		./phonebook_tp
 
 output.txt: cache-test calculate
 	./calculate
@@ -63,4 +71,4 @@ calculate: calculate.c
 .PHONY: clean
 clean:
 	$(RM) $(EXEC) *.o perf.* \
-	      	calculate orig.txt opt.txt output.txt runtime.png align.txt
+	      	calculate orig.txt opt.txt tp.txt output.txt runtime.png align.txt

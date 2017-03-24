@@ -11,20 +11,22 @@
 
 #include IMPL
 
-#ifndef OPT
-#define OUTPUT_FILE "orig.txt"
-
-#else
+#ifdef OPT
+#if defined(TP)
+#include "threadpool.h"
+#endif
 #include "text_align.h"
 #include "debug.h"
 #include <fcntl.h>
 #define ALIGN_FILE "align.txt"
-#define OUTPUT_FILE "opt.txt"
-
-#ifndef THREAD_NUM
-#define THREAD_NUM 4
 #endif
 
+#if defined(TP)
+#define OUTPUT_FILE "tp.txt"
+#elif defined(OPT)
+#define OUTPUT_FILE "opt.txt"
+#else
+#define OUTPUT_FILE "orig.txt"
 #endif
 
 #define DICT_FILE "./dictionary/words.txt"
@@ -73,9 +75,11 @@ int main(int argc, char *argv[])
     printf("size of entry : %lu bytes\n", sizeof(entry));
 
 #if defined(OPT)
+#ifndef THREAD_NUM
+#define THREAD_NUM 4
+#endif
     char *map;
     entry *entry_pool;
-    pthread_t threads[THREAD_NUM];
     thread_arg *thread_args[THREAD_NUM];
 
     /* Start timing */
@@ -89,17 +93,32 @@ int main(int argc, char *argv[])
 
     /* Prepare for multi-threading */
     pthread_setconcurrency(THREAD_NUM + 1);
+    //printf("thread level : %d\n", pthread_getconcurrency());
     for (int i = 0; i < THREAD_NUM; i++)
         // Created by malloc, remeber to free them.
         thread_args[i] = createThread_arg(map + MAX_LAST_NAME_SIZE * i, map + file_size, i,
                                           THREAD_NUM, entry_pool + i);
+#if defined(OPT)
     /* Deliver the jobs to all threads and wait for completing */
+    pthread_t threads[THREAD_NUM];
     clock_gettime(CLOCK_REALTIME, &mid);
     for (int i = 0; i < THREAD_NUM; i++)
         pthread_create(&threads[i], NULL, (void *)&append, (void *)thread_args[i]);
 
     for (int i = 0; i < THREAD_NUM; i++)
         pthread_join(threads[i], NULL);
+#endif
+
+#if defined(TP)
+#define QUEUE_SIZE 50
+
+    threadpool_t *pool = threadpool_create(THREAD_NUM, QUEUE_SIZE ,0);
+
+    clock_gettime(CLOCK_MONOTONIC_RAW, &mid);
+    for (int i = 0; i < THREAD_NUM; i++)
+        threadpool_add(pool, &append, (void *)thread_args[i], 0);
+    threadpool_destroy(pool, 1);
+#endif
 
     /* Connect the linked list of each thread */
     for (int i = 0; i < THREAD_NUM; i++) {
